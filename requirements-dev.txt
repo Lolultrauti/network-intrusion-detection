@@ -3,3 +3,7 @@
 # Install with: pip install -r requirements.txt -r requirements-dev.txt
 # For CPU-only torch: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch>=2.0.0
+
+# For live packet capture (live_capture.py). Windows also needs Npcap
+# (https://npcap.com) installed separately, and an Administrator terminal.
+scapy>=2.5.0

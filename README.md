@@ -43,7 +43,10 @@ data_preprocessing.py  # load/clean/encode/scale; saves artifacts
 nn_model.py            # PyTorch MLP (deep learning) with sklearn-style API
 train_model.py         # train RF + XGB + NN, evaluate, save best, SHAP plots
 predict.py             # single-connection prediction + explanation (CLI)
-app.py                 # optional Streamlit dashboard
+logger.py              # prediction logging + Slack alerting
+live_capture.py        # REAL live traffic: scapy sniffer -> stream.csv
+stream_simulator.py    # replay recorded NSL-KDD rows -> stream.csv (demo)
+app.py                 # Streamlit dashboard (single / real-time / monitoring)
 requirements.txt
 README.md
 ```
@@ -106,18 +109,36 @@ Run locally:
 streamlit run app.py
 ```
 
-### Real-time monitoring demo
-Open the app in **Real-time Monitoring** mode, then in a second terminal replay
-NSL-KDD connections into `data/stream.csv` on a timer:
+### Real-time monitoring
+Open the app in **Real-time Monitoring** mode. It auto-refreshes every 5s,
+classifies each new line appended to `data/stream.csv`, logs to
+`logs/predictions.csv`, and (if `SLACK_WEBHOOK_URL` is set) alerts on
+high-confidence attacks. Two ways to feed it:
+
+**A) Real live traffic — `live_capture.py` (scapy packet sniffer)**
+Sniffs your actual network interface, assembles connections, computes the
+traffic features, and appends them live:
 ```bash
-python stream_simulator.py --interval 2            # 1 line every 2s, forever
-python stream_simulator.py --interval 1 --count 50 # 50 lines, 1s apart
+pip install scapy            # + install Npcap (https://npcap.com) on Windows
+# run in an Administrator terminal (Windows) or with sudo (Linux/macOS):
+python live_capture.py --iface "Wi-Fi"
+```
+> **Honest limitation:** only the ~20 *traffic* features (bytes, durations,
+> per-host/per-service counts and error rates) are derivable from packet
+> headers. The ~21 *content* features (`hot`, `num_failed_logins`, `logged_in`,
+> `su_attempted`, ...) need payload/host inspection and are **zero-filled**.
+> Practical effect: DoS and Probe attacks stay detectable; R2L/U2R (content-
+> based) mostly read as Normal. This is a fundamental limit of a KDD'99-era
+> model on live packets, not a bug.
+
+**B) Replay recorded data — `stream_simulator.py`**
+No capture privileges needed. Replays rows from the **recorded** NSL-KDD test
+file (not live traffic) on a timer — useful for demos and for triggering alerts:
+```bash
+python stream_simulator.py --interval 2            # 1 line every 2s
 python stream_simulator.py --only-attacks          # attacks only (fires alerts)
 python stream_simulator.py --reset                 # clear stream (header only)
 ```
-The dashboard auto-refreshes every 5s, classifies each new line, logs it to
-`logs/predictions.csv`, and (if `SLACK_WEBHOOK_URL` is set) alerts on
-high-confidence attacks.
 
 ### Deploy to Streamlit Community Cloud (free, public URL)
 1. Push this repo to GitHub (already done if you cloned from there).
