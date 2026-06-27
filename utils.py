@@ -84,7 +84,7 @@ ATTACK_MAP = {
 
     # U2R
     'buffer_overflow': 'U2R', 'loadmodule': 'U2R', 'perl': 'U2R', 'rootkit': 'U2R',
-    'ps': 'U2R', 'sqlattack': 'U2R', 'xterm': 'U2R',
+    'ps': 'U2R', 'sqlattack': 'U2R', 'xterm': 'U2R', 'httptunnel': 'U2R',
 }
 
 

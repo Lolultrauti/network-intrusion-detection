@@ -106,6 +106,19 @@ Run locally:
 streamlit run app.py
 ```
 
+### Real-time monitoring demo
+Open the app in **Real-time Monitoring** mode, then in a second terminal replay
+NSL-KDD connections into `data/stream.csv` on a timer:
+```bash
+python stream_simulator.py --interval 2            # 1 line every 2s, forever
+python stream_simulator.py --interval 1 --count 50 # 50 lines, 1s apart
+python stream_simulator.py --only-attacks          # attacks only (fires alerts)
+python stream_simulator.py --reset                 # clear stream (header only)
+```
+The dashboard auto-refreshes every 5s, classifies each new line, logs it to
+`logs/predictions.csv`, and (if `SLACK_WEBHOOK_URL` is set) alerts on
+high-confidence attacks.
+
 ### Deploy to Streamlit Community Cloud (free, public URL)
 1. Push this repo to GitHub (already done if you cloned from there).
 2. Go to <https://share.streamlit.io> and sign in with GitHub.
