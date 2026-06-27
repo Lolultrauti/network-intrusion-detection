@@ -1,0 +1,5 @@
+# Extra dependencies for training the optional PyTorch neural network.
+# Not needed to run the dashboard or make predictions (XGBoost is the best model).
+# Install with: pip install -r requirements.txt -r requirements-dev.txt
+# For CPU-only torch: pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.0.0
