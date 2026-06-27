@@ -117,7 +117,13 @@ high-confidence attacks. Two ways to feed it:
 
 **A) Real live traffic — `live_capture.py` (scapy packet sniffer)**
 Sniffs your actual network interface, assembles connections, computes the
-traffic features, and appends them live:
+traffic features, and appends them live. Two ways to launch it:
+
+*From the dashboard:* in Real-time Monitoring mode, use the **🎛️ Live capture
+control** panel — pick an interface, set a BPF filter, and Start/Stop. (Launch
+Streamlit from an Admin terminal so the capture subprocess has privileges.)
+
+*From a terminal:*
 ```bash
 pip install scapy            # + install Npcap (https://npcap.com) on Windows
 # run in an Administrator terminal (Windows) or with sudo (Linux/macOS):

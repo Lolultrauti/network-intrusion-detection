@@ -19,6 +19,8 @@ Run:
 
 import os
 import csv
+import sys
+import subprocess
 import pandas as pd
 import streamlit as st
 
@@ -34,10 +36,104 @@ except ImportError:
     HAS_AUTOREFRESH = False
 
 STREAM_PATH = os.path.join("data", "stream.csv")
+CAPTURE_ERR_LOG = os.path.join("logs", "capture.err")
 
 # Alert tuning — kept here so thresholds are easy to change.
 ALERT_CONFIDENCE_THRESHOLD = 0.90
 ALERT_ON_CLASSES = {"DoS", "Probe", "R2L", "U2R"}  # i.e. anything but Normal
+
+
+# ---------------------------------------------------------------------------
+# Live-capture subprocess control (drives live_capture.py from the UI)
+# ---------------------------------------------------------------------------
+def list_interfaces():
+    """Return [(internal_name, friendly_label)] of capture interfaces, or []."""
+    try:  # Windows: friendly names + descriptions
+        from scapy.arch.windows import get_windows_if_list
+        out = []
+        for i in get_windows_if_list():
+            name = i.get("name", "")
+            desc = i.get("description") or name
+            if name:
+                out.append((name, f"{desc}  [{name}]"))
+        if out:
+            return out
+    except Exception:
+        pass
+    try:  # cross-platform fallback
+        from scapy.all import get_if_list
+        return [(n, n) for n in get_if_list()]
+    except Exception:
+        return []
+
+
+def capture_running():
+    p = st.session_state.get("capture_proc")
+    return p is not None and p.poll() is None
+
+
+def start_capture(iface, bpf):
+    """Launch live_capture.py as a subprocess (inherits this process's privileges)."""
+    os.makedirs("logs", exist_ok=True)
+    err = open(CAPTURE_ERR_LOG, "w", encoding="utf-8")
+    cmd = [sys.executable, "live_capture.py", "--filter", bpf or "ip"]
+    if iface:
+        cmd += ["--iface", iface]
+    st.session_state.capture_proc = subprocess.Popen(
+        cmd, stdout=subprocess.DEVNULL, stderr=err)
+    st.session_state.capture_attempted = True
+
+
+def stop_capture():
+    p = st.session_state.get("capture_proc")
+    if p and p.poll() is None:
+        p.terminate()
+        try:
+            p.wait(timeout=3)
+        except Exception:
+            p.kill()
+    st.session_state.capture_proc = None
+
+
+def render_capture_controls():
+    """Interface picker + start/stop, shown atop the Real-time page."""
+    with st.expander("🎛️ Live capture control (scapy)", expanded=True):
+        ifaces = list_interfaces()
+        if not ifaces:
+            st.info(
+                "scapy not available. Install it (`pip install scapy`, plus "
+                "**Npcap** on Windows) to capture from here — or run "
+                "`python live_capture.py` in a separate terminal.")
+            return
+
+        labels = [lbl for _, lbl in ifaces]
+        sel = st.selectbox("Network interface", labels,
+                           index=0, key="capture_iface_sel")
+        bpf = st.text_input("BPF filter", value="ip", key="capture_bpf",
+                            help="e.g. 'ip', 'tcp', 'tcp port 80'")
+
+        running = capture_running()
+        c1, c2, c3 = st.columns([1, 1, 2])
+        if c1.button("▶ Start", disabled=running, use_container_width=True):
+            iface_name = ifaces[labels.index(sel)][0]
+            start_capture(iface_name, bpf)
+            st.rerun()
+        if c2.button("⏹ Stop", disabled=not running, use_container_width=True):
+            stop_capture()
+            st.rerun()
+        c3.markdown("**🟢 Capturing**" if running else "**⚪ Stopped**")
+
+        st.caption("⚠️ Capture needs admin privileges — launch Streamlit from an "
+                   "Administrator terminal (Windows) or with sudo (Linux/macOS), "
+                   "else it fails with a permission/Npcap error below.")
+
+        # If the process died, surface its stderr (Npcap missing, perms, etc.).
+        if (not running and st.session_state.get("capture_attempted")
+                and os.path.exists(CAPTURE_ERR_LOG)):
+            err_txt = open(CAPTURE_ERR_LOG, encoding="utf-8").read().strip()
+            if err_txt:
+                st.error("Capture process stopped. Last error output:")
+                st.code(err_txt[-1200:])
 
 st.set_page_config(page_title="AI Network Intrusion Detection", page_icon="🛡️",
                    layout="wide")
@@ -177,7 +273,10 @@ def page_single():
 def page_realtime():
     st.subheader("📡 Real-time Monitoring")
     st.caption("Auto-refreshes every 5s and classifies new lines appended to "
-               f"`{STREAM_PATH}`.")
+               f"`{STREAM_PATH}` (by live capture or the replay simulator).")
+
+    # In-app live packet capture control.
+    render_capture_controls()
 
     if HAS_AUTOREFRESH:
         st_autorefresh(interval=5000, key="rt_refresh")
